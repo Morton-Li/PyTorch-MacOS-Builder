@@ -1,0 +1,123 @@
+name: Build PyTorch
+
+on:
+  workflow_dispatch:  # 手动触发
+
+env:
+  VERSION: "2.3.0"  # PyTorch 版本号
+
+jobs:
+  build:
+    runs-on: macos-13
+    strategy:
+      matrix:
+        python_version: [ 3.11, 3.12 ]
+    name: Build PyTorch for Python ${{ matrix.python_version }}
+    steps:
+      - name: Restore PyTorch source from cache
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ env.VERSION }}
+
+      - name: Clone PyTorch repo
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "v${{ env.VERSION }}" --recursive https://github.com/pytorch/pytorch.git pytorch
+          git -C pytorch submodule update --init --recursive --depth 1 || git -C pytorch submodule update --init --recursive --depth 10 || git -C pytorch submodule update --init --recursive
+
+      - name: Save PyTorch source to cache
+        id: cache-save
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ env.VERSION }}
+
+      - name: Build wheel
+        run: |
+          set -e
+          brew install ninja pkg-config libuv
+          sudo xcode-select --switch /Applications/Xcode_14.3.app
+          
+          export USE_CUDA=OFF
+          export USE_CUDNN=OFF
+          export USE_CUSPARSELT=OFF
+          export USE_MPS=OFF
+          export USE_ROCM=OFF
+          export USE_ROCM_KERNEL_ASSERT=OFF
+          export USE_NNPACK=ON
+          export USE_MPI=OFF
+          export USE_DISTRIBUTED=ON
+          export BLAS="MKL"
+          export USE_MKLDNN=ON
+          export USE_OPENMP=ON
+          export PYTORCH_BUILD_VERSION=${VERSION}
+          export PYTORCH_BUILD_NUMBER=1
+          export CMAKE_OSX_ARCHITECTURES="x86_64"
+          export MAX_JOBS=$(sysctl -n hw.logicalcpu)
+          if [ "$MAX_JOBS" -gt 4 ]; then
+              export MAX_JOBS=4
+          fi
+          
+          export MACOSX_DEPLOYMENT_TARGET=11.0
+          export CC="/Applications/Xcode_14.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          export CXX="/Applications/Xcode_14.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
+          
+          mkdir -p wheels
+          
+          python${{ matrix.python_version }} -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip setuptools wheel
+          pip install -r pytorch/requirements.txt
+          pip install --force-reinstall cmake==3.25.2 numpy==1.26.4
+          pip install mkl-static==2022.2.0 mkl-include==2022.2.0
+
+          export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
+          export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
+          
+          # 补充 OpenMP 头文件
+          wget -O /Applications/Xcode_14.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/14.0.3/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
+
+          echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
+
+          cd pytorch
+          git clean -xfd
+
+          python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
+
+          cp dist/*.whl ../wheels/
+          cd ..
+          
+          if [ "$(ls wheels/*.whl 2>/dev/null | wc -l)" -eq 0 ]; then
+            echo "❌ No wheel built. Tag will not be created."
+            exit 1
+          fi
+
+      - name: Upload wheels as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: torch-${{ env.VERSION }}-py${{ matrix.python_version }}-macosx-wheel
+          path: wheels/*.whl
+
+  release:
+    needs: [build]
+    runs-on: macos-13
+    name: Create release and upload wheels
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wheels
+          merge-multiple: true
+
+      - name: Create release and upload wheels
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: "PyTorch ${{ env.VERSION }} Release"
+          files: wheels/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
