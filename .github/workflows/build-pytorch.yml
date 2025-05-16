@@ -4,14 +4,14 @@ on:
   workflow_dispatch:  # 手动触发
 
 env:
-  VERSION: "2.5.1"  # PyTorch 版本号
+  VERSION: "2.6.0"  # PyTorch 版本号
 
 jobs:
   build:
     runs-on: macos-13
     strategy:
       matrix:
-        python_version: [ 3.11, 3.12 ]
+        python_version: [ 3.11, 3.12, 3.13 ]
     name: Build PyTorch for Python ${{ matrix.python_version }}
     steps:
       - name: Restore PyTorch source from cache
@@ -29,7 +29,7 @@ jobs:
 
       - name: Save PyTorch source to cache
         id: cache-save
-        if: steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.restore-cache.outputs.cache-hit != 'true' && matrix.python_version == '3.12'
         uses: actions/cache/save@v4
         with:
           path: pytorch
@@ -39,7 +39,7 @@ jobs:
         run: |
           set -e
           brew install ninja pkg-config libuv
-          sudo xcode-select --switch /Applications/Xcode_14.3.app
+          sudo xcode-select --switch /Applications/Xcode_15.2.app
           
           export USE_CUDA=OFF
           export USE_CUDNN=OFF
@@ -62,8 +62,8 @@ jobs:
           fi
           
           export MACOSX_DEPLOYMENT_TARGET=11.0
-          export CC="/Applications/Xcode_14.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-          export CXX="/Applications/Xcode_14.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          export CC="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          export CXX="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
           export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
           
           mkdir -p wheels
@@ -72,14 +72,14 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip setuptools wheel
           pip install -r pytorch/requirements.txt
-          pip install --force-reinstall cmake==3.25.2 numpy==2.1.3
+          pip install --force-reinstall cmake==3.25.2 "numpy~=2.2.0"
           pip install mkl-static==2023.2.2 mkl-include==2023.2.2
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
           
           # 补充 OpenMP 头文件
-          wget -O /Applications/Xcode_14.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/14.0.3/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
+          wget -O /Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/15.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
 
           echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
 
