@@ -1,17 +1,17 @@
 # PyTorch macOS Builder
 
-> 🔧 自动构建 PyTorch 官方发行版本的 macOS 平台兼容 `.whl` 安装包。
+> 🔧 自动构建 PyTorch 官方发行版本的 macOS 平台兼容 `.whl` 安装包。  
 > 🔧 Automatically build official PyTorch release `.whl` packages for macOS
 
 ---
 
 ## 📦 项目简介 Project Introduction
 
-本项目通过 GitHub Actions 定期获取 [PyTorch 官方仓库](https://github.com/pytorch/pytorch) 的最新稳定版本，并自动构建适用于 **macOS** 的 Python wheel 安装包。
+[本项目](https://github.com/Morton-Li/PyTorch-MacOS-Builder)通过 GitHub Actions 定期获取 [PyTorch 官方仓库](https://github.com/pytorch/pytorch) 的最新稳定版本，并自动构建适用于 **macOS** 的 Python wheel 安装包。
 
 构建产物为**多 Python 版本**的 `.whl` 文件，便于在老款 Mac 上继续使用高版本 PyTorch。
 
-This project uses GitHub Actions to periodically fetch the latest stable release from the [official PyTorch repository](https://github.com/pytorch/pytorch), and automatically builds Python wheel packages for **macOS**.
+[This project](https://github.com/Morton-Li/PyTorch-MacOS-Builder) uses GitHub Actions to periodically fetch the latest stable release from the [official PyTorch repository](https://github.com/pytorch/pytorch), and automatically builds Python wheel packages for **macOS**.
 
 The output includes `.whl` files for **multiple Python versions**, allowing users to continue using newer versions of PyTorch on older Mac machines.
 
