@@ -1,0 +1,65 @@
+name: Cache PyTorch's Latest Tag
+
+on:
+  workflow_dispatch:  # 手动触发
+  schedule:
+    - cron: '0 18 * * *'  # 每天 18:00 UTC 自动执行
+
+jobs:
+  cache_latest_tag:
+    runs-on: macos-13
+    steps:
+      - name: Get latest PyTorch stable tag
+        id: get_tag
+        run: |
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/pytorch/pytorch/tags)
+
+          if echo "$RESPONSE" | jq -e 'type=="array"' >/dev/null; then
+            LATEST_TAG=$(echo "$RESPONSE" | jq -r '.[].name' | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | sort -Vr | head -n 1)
+          else
+            echo "❌ Unexpected response: $RESPONSE"
+            exit 1
+          fi
+
+          echo "Latest tag: $LATEST_TAG"
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "LATEST_VERSION=${LATEST_TAG#v}" >> $GITHUB_OUTPUT
+
+          # 获取当前 repo 的 Releases
+          RELEASES_JSON=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases")
+          # 判断是否为空数组
+          if echo "$RELEASES_JSON" | jq -e 'length == 0' >/dev/null; then
+            echo "ℹ️ No releases found. Proceeding to cache $LATEST_TAG."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            EXISTING_TAGS=$(echo "$RELEASES_JSON" | jq -r '.[].tag_name')
+            if echo "$EXISTING_TAGS" | grep -q "^$LATEST_TAG$"; then
+              echo "✅ $LATEST_TAG already exists in releases. Skipping cache."
+              echo "skip=true" >> $GITHUB_OUTPUT
+            else
+              echo "⏳ $LATEST_TAG not found in releases. Proceeding to cache."
+              echo "skip=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Restore PyTorch source from cache
+        if: steps.get_tag.outputs.skip == 'false'
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
+
+      - name: Clone PyTorch repo
+        if: steps.get_tag.outputs.skip == 'false' && steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "${{ steps.get_tag.outputs.LATEST_TAG }}" --recursive https://github.com/pytorch/pytorch.git pytorch
+          git -C pytorch submodule update --init --recursive --depth 1 || git -C pytorch submodule update --init --recursive --depth 10 || git -C pytorch submodule update --init --recursive
+
+      - name: Save PyTorch source to cache
+        id: cache-save
+        if: steps.get_tag.outputs.skip == 'false' && steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
