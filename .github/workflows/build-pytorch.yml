@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # 手动触发
 
 env:
-  VERSION: "2.7.0"  # PyTorch 版本号
+  VERSION: "2.7.1"  # PyTorch 版本号
 
 jobs:
   build:
