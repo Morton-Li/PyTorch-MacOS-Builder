@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # 手动触发
 
 env:
-  VERSION: "2.7.1"  # PyTorch 版本号
+  VERSION: "2.8.0"  # PyTorch 版本号
 
 jobs:
   build:
@@ -38,7 +38,6 @@ jobs:
       - name: Build wheel
         run: |
           set -e
-          brew install ninja pkg-config libuv
           sudo xcode-select --switch /Applications/Xcode_15.2.app
           
           export USE_CUDA=OFF
@@ -72,7 +71,7 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip setuptools wheel
           pip install -r pytorch/requirements.txt
-          pip install --force-reinstall cmake==3.25.2 "numpy~=2.2.0"
+          pip install --force-reinstall cmake==3.31.6
           pip install mkl-static==2023.2.2 mkl-include==2023.2.2
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
