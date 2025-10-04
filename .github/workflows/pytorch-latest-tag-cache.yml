@@ -12,10 +12,14 @@ jobs:
       - name: Get latest PyTorch stable tag
         id: get_tag
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/pytorch/pytorch/tags)
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/pytorch/pytorch/tags?per_page=100)
 
           if echo "$RESPONSE" | jq -e 'type=="array"' >/dev/null; then
             LATEST_TAG=$(echo "$RESPONSE" | jq -r '.[].name' | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | sort -Vr | head -n 1)
+            if [ -z "$LATEST_TAG" ]; then
+              echo "❌ No valid tags found."
+              exit 1
+            fi
           else
             echo "❌ Unexpected response: $RESPONSE"
             exit 1
