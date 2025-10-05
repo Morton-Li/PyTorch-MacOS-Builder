@@ -8,7 +8,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     strategy:
       matrix:
         python_version: [ 3.11, 3.12, 3.13 ]
@@ -38,7 +38,7 @@ jobs:
       - name: Build wheel
         run: |
           set -e
-          sudo xcode-select --switch /Applications/Xcode_15.2.app
+          sudo xcode-select --switch /Applications/Xcode_16.4.app
           
           export USE_CUDA=OFF
           export USE_CUDNN=OFF
@@ -61,8 +61,8 @@ jobs:
           fi
           
           export MACOSX_DEPLOYMENT_TARGET=11.0
-          export CC="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-          export CXX="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
           export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
           
           mkdir -p wheels
@@ -78,7 +78,7 @@ jobs:
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
           
           # 补充 OpenMP 头文件
-          wget -O /Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/15.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
+          wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
 
           echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
 
@@ -103,7 +103,7 @@ jobs:
 
   release:
     needs: [build]
-    runs-on: macos-13
+    runs-on: macos-15-intel
     name: Create release and upload wheels
     steps:
       - name: Download all wheel artifacts

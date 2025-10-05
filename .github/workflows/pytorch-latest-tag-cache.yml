@@ -7,7 +7,7 @@ on:
 
 jobs:
   cache_latest_tag:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - name: Get latest PyTorch stable tag
         id: get_tag
