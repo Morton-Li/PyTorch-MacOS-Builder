@@ -1,0 +1,210 @@
+name: Auto Build PyTorch
+
+on:
+  workflow_dispatch:  # 手动触发
+  schedule:
+    - cron: '0 18 * * *'  # 每天 18:00 UTC 自动执行
+
+jobs:
+  get_latest_tag:
+    runs-on: macos-15-intel
+    outputs:
+      version: ${{ steps.get_tag.outputs.LATEST_VERSION }}
+      tag: ${{ steps.get_tag.outputs.LATEST_TAG }}
+      skip_build: ${{ steps.get_tag.outputs.skip_build }}
+    steps:
+      - name: Get latest PyTorch stable tag
+        id: get_tag
+        run: |
+          LATEST_TAG=""
+          
+          page=1
+          while :; do
+            echo "Fetching page $page ..."
+            RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/pytorch/pytorch/tags?per_page=100&page=$page")
+          
+            # 如果响应不是数组则退出
+            if ! echo "$RESPONSE" | jq -e 'type=="array"' >/dev/null; then
+              echo "❌ Unexpected response: $RESPONSE"
+              exit 1
+            fi
+          
+            # 提取符合格式的 tag
+            TAG=$(echo "$RESPONSE" | jq -r '.[].name' | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | sort -Vr | head -n 1)
+            if [ -n "$TAG" ]; then
+              # 与已有的 LATEST_TAG 比较取最新
+              if [ -z "$LATEST_TAG" ] || [ "$(printf "%s\n%s" "$TAG" "$LATEST_TAG" | sort -Vr | head -n1)" = "$TAG" ]; then
+                LATEST_TAG="$TAG"
+              fi
+            fi
+          
+            # 如果有 LATEST_TAG 则跳出循环
+            if [ -n "$LATEST_TAG" ]; then
+              break
+            fi
+          
+            # 最多翻 20 页
+            if [ "$page" -ge 20 ]; then
+              break
+            fi
+          
+            page=$((page + 1))
+          done
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "❌ No valid tags found."
+            exit 1
+          fi
+          
+          echo "Latest tag: $LATEST_TAG"
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "LATEST_VERSION=${LATEST_TAG#v}" >> $GITHUB_OUTPUT
+
+          # 获取当前 repo 的 Releases
+          RELEASES_JSON=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases")
+          # 判断是否为空数组
+          if echo "$RELEASES_JSON" | jq -e 'length == 0' >/dev/null; then
+            echo "ℹ️ No releases found. Will proceed to build $LATEST_TAG."
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+          else
+            EXISTING_TAGS=$(echo "$RELEASES_JSON" | jq -r '.[].tag_name')
+            if echo "$EXISTING_TAGS" | grep -q "^$LATEST_TAG$"; then
+              echo "✅ $LATEST_TAG already in releases. Skipping build."
+              echo "skip_build=true" >> $GITHUB_OUTPUT
+            else
+              echo "⏳ $LATEST_TAG not released. Will proceed to build and upload."
+              echo "skip_build=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Stop early if already built
+        if: steps.get_tag.outputs.skip_build == 'true'
+        run: |
+          echo "✅ Build skipped."
+
+      - name: Restore PyTorch source from cache
+        if: steps.get_tag.outputs.skip_build == 'false'
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
+
+      - name: Clone PyTorch repo
+        if: steps.get_tag.outputs.skip_build == 'false' && steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "v${{ steps.get_tag.outputs.LATEST_VERSION }}" --recursive https://github.com/pytorch/pytorch.git pytorch
+          git -C pytorch submodule update --init --recursive --depth 1 || git -C pytorch submodule update --init --recursive --depth 10 || git -C pytorch submodule update --init --recursive
+
+      - name: Save PyTorch source to cache
+        id: cache-save
+        if: steps.get_tag.outputs.skip_build == 'false' && steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
+
+  build:
+    runs-on: macos-15-intel
+    needs: [get_latest_tag]
+    if: needs.get_latest_tag.outputs.skip_build == 'false'
+    strategy:
+      matrix:
+        python_version: [ 3.11, 3.12, 3.13 ]
+    name: Build PyTorch for Python ${{ matrix.python_version }}
+    steps:
+      - name: Restore PyTorch source from cache
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ needs.get_latest_tag.outputs.version }}
+
+      - name: Build wheel
+        run: |
+          set -e
+          sudo xcode-select --switch /Applications/Xcode_16.4.app
+          
+          export USE_CUDA=OFF
+          export USE_CUDNN=OFF
+          export USE_CUSPARSELT=OFF
+          export USE_MPS=OFF
+          export USE_ROCM=OFF
+          export USE_ROCM_KERNEL_ASSERT=OFF
+          export USE_NNPACK=ON
+          export USE_MPI=OFF
+          export USE_DISTRIBUTED=ON
+          export BLAS="MKL"
+          export USE_MKLDNN=ON
+          export USE_OPENMP=ON
+          export PYTORCH_BUILD_VERSION=${VERSION}
+          export PYTORCH_BUILD_NUMBER=1
+          export CMAKE_OSX_ARCHITECTURES="x86_64"
+          export MAX_JOBS=$(sysctl -n hw.logicalcpu)
+          if [ "$MAX_JOBS" -gt 4 ]; then
+              export MAX_JOBS=4
+          fi
+          
+          export MACOSX_DEPLOYMENT_TARGET=11.0
+          export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
+          
+          mkdir -p wheels
+          
+          python${{ matrix.python_version }} -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip setuptools wheel
+          pip install -r pytorch/requirements.txt
+          pip install --force-reinstall cmake==3.31.6
+          pip install mkl-static==2023.2.2 mkl-include==2023.2.2
+
+          export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
+          export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
+          
+          # 补充 OpenMP 头文件
+          wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
+
+          echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
+
+          cd pytorch
+          git clean -xfd
+          
+          find scripts -type f -name "*.sh" -exec chmod +x {} +
+
+          python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
+
+          cp dist/*.whl ../wheels/
+          cd ..
+          
+          if [ "$(ls wheels/*.whl 2>/dev/null | wc -l)" -eq 0 ]; then
+            echo "❌ No wheel built. Tag will not be created."
+            exit 1
+          fi
+
+      - name: Upload wheels as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: torch-${{ needs.get_latest_tag.outputs.version }}-py${{ matrix.python_version }}-macosx-wheel
+          path: wheels/*.whl
+
+#  release:
+#    needs: [ get_latest_tag, build ]
+#    if: needs.get_latest_tag.outputs.skip_build == 'false'
+#    runs-on: macos-15-intel
+#    name: Create release and upload wheels
+#    steps:
+#      - name: Download all wheel artifacts
+#        uses: actions/download-artifact@v4
+#        with:
+#          path: wheels
+#          merge-multiple: true
+#
+#      - name: Create release and upload wheels
+#        uses: softprops/action-gh-release@v2
+#        with:
+#          tag_name: ${{ needs.get_latest_tag.outputs.tag }}
+#          name: "PyTorch ${{ needs.get_latest_tag.outputs.version }} Release"
+#          files: wheels/*.whl
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

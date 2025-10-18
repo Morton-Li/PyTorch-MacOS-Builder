@@ -1,0 +1,48 @@
+name: Build Debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'PyTorch version (e.g., 2.9.0)'
+        required: true
+        default: ''
+      run-on:
+        description: 'Run on which OS?'
+        required: true
+        default: 'macos-15-intel'
+
+jobs:
+  debug_session:
+    runs-on: ${{ github.event.inputs.run-on }}
+    steps:
+      - name: Restore PyTorch source from cache
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ github.event.inputs.version }}
+
+      - name: Clone PyTorch repo
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "🎯 Using manually provided tag: v${{ github.event.inputs.version }}"
+
+          git clone --depth 1 --branch "v${{ github.event.inputs.version }}" --recursive https://github.com/pytorch/pytorch.git pytorch
+          cd pytorch
+          git submodule update --init --recursive --depth 1 || git submodule update --init --recursive --depth 10 || git submodule update --init --recursive
+
+      - name: Save PyTorch source to cache
+        id: cache-save
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: pytorch
+          key: pytorch-${{ github.event.inputs.version }}
+
+      - name: Install dependencies
+        run: |
+          brew install ccache
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3

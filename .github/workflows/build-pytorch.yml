@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # 手动触发
 
 env:
-  VERSION: "2.8.0"  # PyTorch 版本号
+  VERSION: "2.9.0"  # PyTorch 版本号
 
 jobs:
   build:
@@ -84,6 +84,8 @@ jobs:
 
           cd pytorch
           git clean -xfd
+          
+          find scripts -type f -name "*.sh" -exec chmod +x {} +
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
 
