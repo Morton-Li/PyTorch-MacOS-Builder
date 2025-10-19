@@ -188,23 +188,23 @@ jobs:
           name: torch-${{ needs.get_latest_tag.outputs.version }}-py${{ matrix.python_version }}-macosx-wheel
           path: wheels/*.whl
 
-#  release:
-#    needs: [ get_latest_tag, build ]
-#    if: needs.get_latest_tag.outputs.skip_build == 'false'
-#    runs-on: macos-15-intel
-#    name: Create release and upload wheels
-#    steps:
-#      - name: Download all wheel artifacts
-#        uses: actions/download-artifact@v4
-#        with:
-#          path: wheels
-#          merge-multiple: true
-#
-#      - name: Create release and upload wheels
-#        uses: softprops/action-gh-release@v2
-#        with:
-#          tag_name: ${{ needs.get_latest_tag.outputs.tag }}
-#          name: "PyTorch ${{ needs.get_latest_tag.outputs.version }} Release"
-#          files: wheels/*.whl
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release:
+    needs: [ get_latest_tag, build ]
+    if: needs.get_latest_tag.outputs.skip_build == 'false'
+    runs-on: macos-15-intel
+    name: Create release and upload wheels
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wheels
+          merge-multiple: true
+
+      - name: Create release and upload wheels
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get_latest_tag.outputs.tag }}
+          name: "PyTorch ${{ needs.get_latest_tag.outputs.version }} Release"
+          files: wheels/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
