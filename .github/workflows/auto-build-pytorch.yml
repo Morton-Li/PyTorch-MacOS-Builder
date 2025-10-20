@@ -7,7 +7,7 @@ on:
 
 jobs:
   get_latest_tag:
-    runs-on: macos-15-intel
+    runs-on: macos-14-large
     outputs:
       version: ${{ steps.get_tag.outputs.LATEST_VERSION }}
       tag: ${{ steps.get_tag.outputs.LATEST_TAG }}
@@ -110,7 +110,7 @@ jobs:
           key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
 
   build:
-    runs-on: macos-15-intel
+    runs-on: macos-14-large
     needs: [get_latest_tag]
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     strategy:
@@ -128,7 +128,7 @@ jobs:
       - name: Build wheel
         run: |
           set -e
-          sudo xcode-select --switch /Applications/Xcode_16.4.app
+          sudo xcode-select --switch /Applications/Xcode_15.2.app
           
           export USE_CUDA=OFF
           export USE_CUDNN=OFF
@@ -151,8 +151,8 @@ jobs:
           fi
           
           export MACOSX_DEPLOYMENT_TARGET=11.0
-          export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-          export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          export CC="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          export CXX="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
           export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
           
           mkdir -p wheels
@@ -166,10 +166,9 @@ jobs:
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
-          export CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DCMAKE_INSTALL_RPATH=@loader_path/lib -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=OFF -DCMAKE_MACOSX_RPATH=ON -DCMAKE_INSTALL_NAME_DIR=@rpath"
           
           # 补充 OpenMP 头文件
-          wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
+          wget -O /Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/15.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
 
           echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
 
@@ -197,7 +196,7 @@ jobs:
   release:
     needs: [ get_latest_tag, build ]
     if: (needs.get_latest_tag.outputs.skip_build == 'false') && (needs.build.result == 'success') && (github.event_name != 'workflow_dispatch')
-    runs-on: macos-15-intel
+    runs-on: macos-14-large
     name: Create release and upload wheels
     steps:
       - name: Download all wheel artifacts
