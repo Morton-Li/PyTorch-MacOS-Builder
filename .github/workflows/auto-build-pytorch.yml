@@ -69,8 +69,13 @@ jobs:
           else
             EXISTING_TAGS=$(echo "$RELEASES_JSON" | jq -r '.[].tag_name')
             if echo "$EXISTING_TAGS" | grep -q "^$LATEST_TAG$"; then
-              echo "✅ $LATEST_TAG already in releases. Skipping build."
-              echo "skip_build=true" >> $GITHUB_OUTPUT
+              if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+                echo "🟢 Manual run detected. Force building regardless of existing releases."
+                echo "skip_build=false" >> $GITHUB_OUTPUT
+              else
+                echo "✅ $LATEST_TAG already in releases. Skipping build."
+                echo "skip_build=true" >> $GITHUB_OUTPUT
+              fi
             else
               echo "⏳ $LATEST_TAG not released. Will proceed to build and upload."
               echo "skip_build=false" >> $GITHUB_OUTPUT
@@ -161,6 +166,7 @@ jobs:
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
+          export CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DCMAKE_INSTALL_RPATH=@loader_path/lib -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=OFF -DCMAKE_MACOSX_RPATH=ON -DCMAKE_INSTALL_NAME_DIR=@rpath"
           
           # 补充 OpenMP 头文件
           wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
@@ -190,7 +196,7 @@ jobs:
 
   release:
     needs: [ get_latest_tag, build ]
-    if: needs.get_latest_tag.outputs.skip_build == 'false'
+    if: (needs.get_latest_tag.outputs.skip_build == 'false') && (needs.build.result == 'success') && (github.event_name != 'workflow_dispatch')
     runs-on: macos-15-intel
     name: Create release and upload wheels
     steps:
