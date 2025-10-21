@@ -44,5 +44,14 @@ jobs:
         run: |
           brew install ccache
 
+          sudo xcode-select --switch /Applications/Xcode_16.4.app
+
+          python3.12 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip setuptools wheel
+          pip install -r pytorch/requirements.txt
+          pip install --force-reinstall cmake==3.31.6
+          pip install mkl-static==2023.2.2 mkl-include==2023.2.2
+
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3

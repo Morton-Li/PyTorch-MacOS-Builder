@@ -7,7 +7,7 @@ on:
 
 jobs:
   get_latest_tag:
-    runs-on: macos-14-large
+    runs-on: macos-15-intel
     outputs:
       version: ${{ steps.get_tag.outputs.LATEST_VERSION }}
       tag: ${{ steps.get_tag.outputs.LATEST_TAG }}
@@ -110,7 +110,7 @@ jobs:
           key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
 
   build:
-    runs-on: macos-14-large
+    runs-on: macos-15-intel
     needs: [get_latest_tag]
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     strategy:
@@ -126,33 +126,34 @@ jobs:
           key: pytorch-${{ needs.get_latest_tag.outputs.version }}
 
       - name: Build wheel
+        env:
+          USE_CUDA: "OFF"
+          USE_CUDNN: "OFF"
+          USE_CUSPARSELT: "OFF"
+          USE_MPS: "OFF"
+          USE_ROCM: "OFF"
+          USE_ROCM_KERNEL_ASSERT: "OFF"
+          USE_NNPACK: "ON"
+          USE_MPI: "OFF"
+          USE_DISTRIBUTED: "ON"
+          BLAS: "MKL"
+          USE_MKLDNN: "ON"
+          USE_OPENMP: "ON"
+          PYTORCH_BUILD_VERSION: ${{ needs.get_latest_tag.outputs.version }}
+          PYTORCH_BUILD_NUMBER: "1"
+          CMAKE_OSX_ARCHITECTURES: "x86_64"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
           set -e
-          sudo xcode-select --switch /Applications/Xcode_15.2.app
-          
-          export USE_CUDA=OFF
-          export USE_CUDNN=OFF
-          export USE_CUSPARSELT=OFF
-          export USE_MPS=OFF
-          export USE_ROCM=OFF
-          export USE_ROCM_KERNEL_ASSERT=OFF
-          export USE_NNPACK=ON
-          export USE_MPI=OFF
-          export USE_DISTRIBUTED=ON
-          export BLAS="MKL"
-          export USE_MKLDNN=ON
-          export USE_OPENMP=ON
-          export PYTORCH_BUILD_VERSION=${VERSION}
-          export PYTORCH_BUILD_NUMBER=1
-          export CMAKE_OSX_ARCHITECTURES="x86_64"
+          sudo xcode-select --switch /Applications/Xcode_16.4.app
+
           export MAX_JOBS=$(sysctl -n hw.logicalcpu)
           if [ "$MAX_JOBS" -gt 4 ]; then
               export MAX_JOBS=4
           fi
-          
-          export MACOSX_DEPLOYMENT_TARGET=11.0
-          export CC="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-          export CXX="/Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+
+          export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
           export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
           
           mkdir -p wheels
@@ -168,7 +169,7 @@ jobs:
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
           
           # 补充 OpenMP 头文件
-          wget -O /Applications/Xcode_15.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/15.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
+          wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
 
           echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
 
@@ -176,6 +177,7 @@ jobs:
           git clean -xfd
           
           find scripts -type f -name "*.sh" -exec chmod +x {} +
+          sed -i '' 's|main_link_args: list\[str\] = \[\]|main_link_args: list[str] = ["-Wl,-ld_classic"]|' setup.py
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
 
@@ -196,7 +198,7 @@ jobs:
   release:
     needs: [ get_latest_tag, build ]
     if: (needs.get_latest_tag.outputs.skip_build == 'false') && (needs.build.result == 'success') && (github.event_name != 'workflow_dispatch')
-    runs-on: macos-14-large
+    runs-on: macos-15-intel
     name: Create release and upload wheels
     steps:
       - name: Download all wheel artifacts
