@@ -155,7 +155,7 @@ jobs:
           export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
           export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
           export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
-          
+
           mkdir -p wheels
           
           python${{ matrix.python_version }} -m venv venv
@@ -167,17 +167,18 @@ jobs:
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
+          export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
+          export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
           
           # 补充 OpenMP 头文件
           wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
 
-          echo "➡️ Building PyTorch v$VERSION with Python ${{ matrix.python_version }}"
+          echo "➡️ Building PyTorch ${{ needs.get_latest_tag.outputs.tag }} with Python ${{ matrix.python_version }}"
 
           cd pytorch
           git clean -xfd
           
           find scripts -type f -name "*.sh" -exec chmod +x {} +
-          sed -i '' 's|main_link_args: list\[str\] = \[\]|main_link_args: list[str] = ["-Wl,-ld_classic"]|' setup.py
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
 
