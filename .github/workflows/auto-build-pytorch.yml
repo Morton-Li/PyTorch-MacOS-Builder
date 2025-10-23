@@ -147,6 +147,9 @@ jobs:
           CMAKE_OSX_ARCHITECTURES: "x86_64"
           MACOSX_DEPLOYMENT_TARGET: "11.0"
           BUILD_TEST: "OFF"
+          CC: "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          CXX: "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          LDSHARED: "clang -bundle -undefined dynamic_lookup"
         run: |
           set -e
           
@@ -160,10 +163,6 @@ jobs:
           if [ "$MAX_JOBS" -gt 4 ]; then
               export MAX_JOBS=4
           fi
-
-          export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-          export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
-          export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
           
           python3.12 -m venv venv
           source venv/bin/activate
@@ -172,10 +171,10 @@ jobs:
           pip install --force-reinstall cmake==3.31.6
           pip install mkl-static==2023.2.2 mkl-include==2023.2.2
 
-          export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
+          # export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
-          export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
-          export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
+          # export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
+          # export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
           
           # 补充 OpenMP 头文件
           wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
@@ -186,6 +185,15 @@ jobs:
           git clean -xfd
           
           find scripts -type f -name "*.sh" -exec chmod +x {} +
+
+          export CMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+
+          sed -i '' -E -f - setup.py <<'SED'
+          /self.copy_file\(source_lib, target_lib\)/,/libomp_relocated = True/ {
+            /^[[:space:]]*install_name_tool_args = \[/, /^[[:space:]]*]/ c\
+                      install_name_tool_args = ["-delete_rpath", rpath] if "@loader_path" in rpaths else ["-rpath", rpath, "@loader_path"]
+          }
+          SED
 
           python -m tools.build_libtorch
 
@@ -238,6 +246,9 @@ jobs:
           CMAKE_OSX_ARCHITECTURES: "x86_64"
           MACOSX_DEPLOYMENT_TARGET: "11.0"
           BUILD_TEST: "OFF"
+          CC: "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          CXX: "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
+          LDSHARED: "clang -bundle -undefined dynamic_lookup"
         run: |
           set -e
 
@@ -251,10 +262,6 @@ jobs:
               export MAX_JOBS=4
           fi
 
-          export CC="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-          export CXX="/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
-          export LDSHARED="clang -bundle -undefined dynamic_lookup -isysroot $(xcrun --sdk macosx --show-sdk-path) -arch $CMAKE_OSX_ARCHITECTURES"
-
           mkdir -p wheels
           
           python${{ matrix.python_version }} -m venv venv
@@ -264,10 +271,10 @@ jobs:
           pip install --force-reinstall cmake==3.31.6
           pip install mkl-static==2023.2.2 mkl-include==2023.2.2
 
-          export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
+          # export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
-          export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
-          export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
+          # export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
+          # export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
           
           # 补充 OpenMP 头文件
           wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
@@ -278,6 +285,15 @@ jobs:
           git clean -xfd
           
           find scripts -type f -name "*.sh" -exec chmod +x {} +
+
+          export CMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+
+          sed -i '' -E -f - setup.py <<'SED'
+          /self.copy_file\(source_lib, target_lib\)/,/libomp_relocated = True/ {
+            /^[[:space:]]*install_name_tool_args = \[/, /^[[:space:]]*]/ c\
+                      install_name_tool_args = ["-delete_rpath", rpath] if "@loader_path" in rpaths else ["-rpath", rpath, "@loader_path"]
+          }
+          SED
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
 
