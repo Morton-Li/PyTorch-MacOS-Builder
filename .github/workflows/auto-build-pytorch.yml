@@ -171,7 +171,7 @@ jobs:
           pip install --force-reinstall cmake==3.31.6
           pip install mkl-static==2023.2.2 mkl-include==2023.2.2
 
-          # export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
+          export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
           # export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
           # export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
@@ -271,7 +271,7 @@ jobs:
           pip install --force-reinstall cmake==3.31.6
           pip install mkl-static==2023.2.2 mkl-include==2023.2.2
 
-          # export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
+          export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
           # export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
           # export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
