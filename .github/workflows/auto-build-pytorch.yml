@@ -126,7 +126,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /Users/runner/Library/Caches/ccache
-          key: ccache-${{ needs.get_latest_tag.outputs.version }}
+          key: ccache-LibTorch-${{ needs.get_latest_tag.outputs.tag }}
 
       - name: Build LibTorch
         env:
@@ -195,7 +195,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /Users/runner/Library/Caches/ccache
-          key: ccache-${{ needs.get_latest_tag.outputs.version }}
+          key: ccache-LibTorch-${{ needs.get_latest_tag.outputs.tag }}
 
   build_wheel:
     runs-on: macos-15-intel
@@ -217,7 +217,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /Users/runner/Library/Caches/ccache
-          key: ccache-${{ needs.get_latest_tag.outputs.version }}
+          key: ccache-LibTorch-${{ needs.get_latest_tag.outputs.tag }}
 
       - name: Build wheel
         env:
@@ -243,7 +243,6 @@ jobs:
 
           brew install ccache
           ccache --version
-          ccache -s
 
           sudo xcode-select --switch /Applications/Xcode_16.4.app
 
@@ -281,6 +280,8 @@ jobs:
           find scripts -type f -name "*.sh" -exec chmod +x {} +
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
+
+          ccache -s
 
           cp dist/*.whl ../wheels/
           cd ..
