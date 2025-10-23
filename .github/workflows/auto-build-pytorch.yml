@@ -173,8 +173,6 @@ jobs:
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
-          # export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
-          # export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
           
           # 补充 OpenMP 头文件
           wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
@@ -187,13 +185,6 @@ jobs:
           find scripts -type f -name "*.sh" -exec chmod +x {} +
 
           export CMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
-
-          sed -i '' -E -f - setup.py <<'SED'
-          /self.copy_file\(source_lib, target_lib\)/,/libomp_relocated = True/ {
-            /^[[:space:]]*install_name_tool_args = \[/, /^[[:space:]]*]/ c\
-                      install_name_tool_args = ["-delete_rpath", rpath] if "@loader_path" in rpaths else ["-rpath", rpath, "@loader_path"]
-          }
-          SED
 
           python -m tools.build_libtorch
 
@@ -273,8 +264,6 @@ jobs:
 
           export CMAKE_PREFIX_PATH="$(realpath venv/lib)"
           export CMAKE_INCLUDE_PATH="$(realpath venv/include)"
-          # export CMAKE_EXE_LINKER_FLAGS="-Wl,-ld_classic"
-          # export CMAKE_SHARED_LINKER_FLAGS="-Wl,-ld_classic"
           
           # 补充 OpenMP 头文件
           wget -O /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17.0.0/include/omp.h https://github.com/intel/llvm/raw/refs/heads/sycl/openmp/runtime/src/include/omp.h.var
