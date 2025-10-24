@@ -16,12 +16,15 @@ jobs:
   debug_session:
     runs-on: ${{ github.event.inputs.run-on }}
     steps:
+      - name: Checkout Project
+        uses: actions/checkout@v5
+
       - name: Restore PyTorch source from cache
         id: restore-cache
         uses: actions/cache/restore@v4
         with:
           path: pytorch
-          key: pytorch-${{ github.event.inputs.version }}
+          key: pytorch-v${{ github.event.inputs.version }}
 
       - name: Clone PyTorch repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -38,7 +41,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: pytorch
-          key: pytorch-${{ github.event.inputs.version }}
+          key: pytorch-v${{ github.event.inputs.version }}
 
       - name: Install dependencies
         run: |
