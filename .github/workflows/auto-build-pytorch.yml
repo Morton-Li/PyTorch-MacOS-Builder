@@ -107,13 +107,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: pytorch
-          key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
+          key: pytorch-${{ steps.get_tag.outputs.LATEST_TAG }}
           lookup-only: true
 
       - name: Clone PyTorch repo
         if: steps.get_tag.outputs.skip_build == 'false' && steps.check-pytorch-cache.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 --branch "v${{ steps.get_tag.outputs.LATEST_VERSION }}" --recursive https://github.com/pytorch/pytorch.git pytorch
+          git clone --depth 1 --branch "${{ steps.get_tag.outputs.LATEST_TAG }}" --recursive https://github.com/pytorch/pytorch.git pytorch
           git -C pytorch submodule update --init --recursive --depth 1 || git -C pytorch submodule update --init --recursive --depth 10 || git -C pytorch submodule update --init --recursive
 
       - name: Save PyTorch source to cache
@@ -122,7 +122,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: pytorch
-          key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
+          key: pytorch-${{ steps.get_tag.outputs.LATEST_TAG }}
 
   build_libtorch:
     name: Build LibTorch
@@ -135,7 +135,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: pytorch
-          key: pytorch-${{ needs.get_latest_tag.outputs.version }}
+          key: pytorch-${{ needs.get_latest_tag.outputs.tag }}
           fail-on-cache-miss: true
 
       - name: Restore LibTorch ccache Cache
@@ -230,7 +230,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: pytorch
-          key: pytorch-${{ needs.get_latest_tag.outputs.version }}
+          key: pytorch-${{ needs.get_latest_tag.outputs.tag }}
           fail-on-cache-miss: true
 
       - name: Restore LibTorch ccache Cache
