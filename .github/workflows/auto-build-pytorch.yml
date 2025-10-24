@@ -4,14 +4,21 @@ on:
   workflow_dispatch:  # 手动触发
   schedule:
     - cron: '0 18 * * *'  # 每天 18:00 UTC 自动执行
+  push:
+    tags:
+      - 'v*.*.*'  # 当有新的 tag 推送时触发
 
 jobs:
   get_latest_tag:
+    name: Fetch PyTorch Tag Info
     runs-on: macos-15-intel
     outputs:
       version: ${{ steps.get_tag.outputs.LATEST_VERSION }}
       tag: ${{ steps.get_tag.outputs.LATEST_TAG }}
       skip_build: ${{ steps.get_tag.outputs.skip_build }}
+      major_version: ${{ steps.get_tag.outputs.MAJOR_VERSION }}
+      minor_version: ${{ steps.get_tag.outputs.MINOR_VERSION }}
+      patch_version: ${{ steps.get_tag.outputs.PATCH_VERSION }}
     steps:
       - name: Get latest PyTorch stable tag
         id: get_tag
@@ -58,7 +65,15 @@ jobs:
           
           echo "Latest tag: $LATEST_TAG"
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "LATEST_VERSION=${LATEST_TAG#v}" >> $GITHUB_OUTPUT
+          LATEST_VERSION="${LATEST_TAG#v}"
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+          MAJOR_VERSION=$(echo "$LATEST_VERSION" | cut -d. -f1)
+          MINOR_VERSION=$(echo "$LATEST_VERSION" | cut -d. -f2)
+          PATCH_VERSION=$(echo "$LATEST_VERSION" | cut -d. -f3)
+          echo "MAJOR_VERSION=${MAJOR_VERSION}" >> $GITHUB_OUTPUT
+          echo "MINOR_VERSION=${MINOR_VERSION}" >> $GITHUB_OUTPUT
+          echo "PATCH_VERSION=${PATCH_VERSION}" >> $GITHUB_OUTPUT
 
           # 获取当前 repo 的 Releases
           RELEASES_JSON=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases")
@@ -84,26 +99,26 @@ jobs:
 
       - name: Stop early if already built
         if: steps.get_tag.outputs.skip_build == 'true'
-        run: |
-          echo "✅ Build skipped."
+        run: echo "✅ Build skipped."
 
-      - name: Restore PyTorch source from cache
+      - name: Check PyTorch cache existence
         if: steps.get_tag.outputs.skip_build == 'false'
-        id: restore-cache
+        id: check-pytorch-cache
         uses: actions/cache/restore@v4
         with:
           path: pytorch
           key: pytorch-${{ steps.get_tag.outputs.LATEST_VERSION }}
+          lookup-only: true
 
       - name: Clone PyTorch repo
-        if: steps.get_tag.outputs.skip_build == 'false' && steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.get_tag.outputs.skip_build == 'false' && steps.check-pytorch-cache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch "v${{ steps.get_tag.outputs.LATEST_VERSION }}" --recursive https://github.com/pytorch/pytorch.git pytorch
           git -C pytorch submodule update --init --recursive --depth 1 || git -C pytorch submodule update --init --recursive --depth 10 || git -C pytorch submodule update --init --recursive
 
       - name: Save PyTorch source to cache
         id: cache-save
-        if: steps.get_tag.outputs.skip_build == 'false' && steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.get_tag.outputs.skip_build == 'false' && steps.check-pytorch-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: pytorch
@@ -121,12 +136,14 @@ jobs:
         with:
           path: pytorch
           key: pytorch-${{ needs.get_latest_tag.outputs.version }}
+          fail-on-cache-miss: true
 
       - name: Restore LibTorch ccache Cache
         uses: actions/cache/restore@v4
         with:
           path: /Users/runner/Library/Caches/ccache
           key: ccache-LibTorch-${{ needs.get_latest_tag.outputs.tag }}
+          restore-keys: ccache-LibTorch-v${{ needs.get_latest_tag.outputs.major_version }}.${{ needs.get_latest_tag.outputs.minor_version }}.
 
       - name: Build LibTorch
         env:
@@ -205,12 +222,16 @@ jobs:
         python_version: [ 3.11, 3.12, 3.13 ]
     name: Build PyTorch for Python ${{ matrix.python_version }}
     steps:
+      - name: Checkout Project
+        uses: actions/checkout@v5
+
       - name: Restore PyTorch source from cache
         id: restore-cache
         uses: actions/cache/restore@v4
         with:
           path: pytorch
           key: pytorch-${{ needs.get_latest_tag.outputs.version }}
+          fail-on-cache-miss: true
 
       - name: Restore LibTorch ccache Cache
         uses: actions/cache/restore@v4
@@ -277,12 +298,12 @@ jobs:
 
           export CMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
 
-          sed -i '' -E -f - setup.py <<'SED'
-          /self.copy_file\(source_lib, target_lib\)/,/libomp_relocated = True/ {
-            /^[[:space:]]*install_name_tool_args = \[/, /^[[:space:]]*]/ c\
-                      install_name_tool_args = ["-delete_rpath", rpath] if "@loader_path" in rpaths else ["-rpath", rpath, "@loader_path"]
-          }
-          SED
+          echo "Applying all patches ..."
+          find ../patches -type f -name "*.patch" -print | sort | while read -r patch; do
+            echo " -> Applying $patch"
+            git apply --check "$patch" || { echo "❌ Failed to apply $patch"; exit 1; }
+            git apply "$patch"
+          done
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
 
@@ -302,7 +323,7 @@ jobs:
           set -e
           python${{ matrix.python_version }} -m venv test-venv
           source test-venv/bin/activate
-          pip install --upgrade pip setuptools
+          pip install --upgrade pip setuptools numpy
           pip install wheels/*.whl
 
           python -c "import torch; print(torch.__version__)"

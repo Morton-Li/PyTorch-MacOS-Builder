@@ -1,0 +1,17 @@
+diff --git a/setup.py b/setup.py
+index 11ca484..7c9764d 100644
+--- a/setup.py
++++ b/setup.py
+@@ -1115,11 +1115,7 @@ class build_ext(setuptools.command.build_ext.build_ext):
+             # This should prevent delocate from attempting to package another instance
+             # of OpenMP library in torch wheel as well as loading two libomp.dylib into
+             # the address space, as libraries are cached by their unresolved names
+-            install_name_tool_args = [
+-                "-rpath",
+-                rpath,
+-                "@loader_path",
+-            ]
++            install_name_tool_args = ["-delete_rpath", rpath] if "@loader_path" in rpaths else ["-rpath", rpath, "@loader_path"]
+             libomp_relocated = True
+             break
+         if not libomp_relocated and os.path.exists(omplib_path):
