@@ -130,22 +130,25 @@ jobs:
     needs: [get_latest_tag]
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     steps:
+      - name: Restore LibTorch ccache Cache
+        id: restore-ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /Users/runner/Library/Caches/ccache
+          key: ccache-LibTorch-${{ needs.get_latest_tag.outputs.tag }}
+          lookup-only: true
+
       - name: Restore PyTorch source from cache
-        id: restore-cache
+        id: restore-source-code
+        if: steps.restore-ccache.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: pytorch
           key: pytorch-${{ needs.get_latest_tag.outputs.tag }}
           fail-on-cache-miss: true
 
-      - name: Restore LibTorch ccache Cache
-        uses: actions/cache/restore@v4
-        with:
-          path: /Users/runner/Library/Caches/ccache
-          key: ccache-LibTorch-${{ needs.get_latest_tag.outputs.tag }}
-          restore-keys: ccache-LibTorch-v${{ needs.get_latest_tag.outputs.major_version }}.${{ needs.get_latest_tag.outputs.minor_version }}.
-
       - name: Build LibTorch
+        if: steps.restore-ccache.outputs.cache-hit != 'true'
         env:
           USE_CUDA: "OFF"
           USE_CUDNN: "OFF"
@@ -208,6 +211,7 @@ jobs:
           ccache -s
 
       - name: Save LibTorch ccache Cache
+        if: steps.restore-ccache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: /Users/runner/Library/Caches/ccache
@@ -219,7 +223,7 @@ jobs:
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     strategy:
       matrix:
-        python_version: [ 3.11, 3.12, 3.13 ]
+        python_version: [ 3.11, 3.12, 3.13, 3.14 ]
     name: Build PyTorch for Python ${{ matrix.python_version }}
     steps:
       - name: Checkout Project
