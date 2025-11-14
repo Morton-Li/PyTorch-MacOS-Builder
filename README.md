@@ -20,10 +20,10 @@ The output includes `.whl` files for **multiple Python versions**, allowing user
 ## 🛠 使用方式 How to Use
 
 1. 从 [Releases 页面](../../releases) 下载你所需版本的 `.whl`：  
-   示例文件名：`torch-2.9.0-cp312-cp312-macosx_11_0_x86_64.whl`
+   示例文件名：`torch-2.9.1-cp312-cp312-macosx_11_0_x86_64.whl`
 2. 使用 `pip` 安装：
     ```bash
-    pip install torch-2.9.0-cp312-cp312-macosx_11_0_x86_64.whl
+    pip install torch-2.9.1-cp312-cp312-macosx_11_0_x86_64.whl
     ```
 3. 验证是否安装成功：
    ```bash
