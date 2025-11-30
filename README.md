@@ -20,10 +20,10 @@ The output includes `.whl` files for **multiple Python versions**, allowing user
 ## 🛠 使用方式 How to Use
 
 1. 从 [Releases 页面](../../releases) 下载你所需版本的 `.whl`：  
-   示例文件名：`torch-2.9.1-cp312-cp312-macosx_11_0_x86_64.whl`
+   示例文件名：`torch-2.9.1-cp313-cp313-macosx_11_0_x86_64.whl`
 2. 使用 `pip` 安装：
     ```bash
-    pip install torch-2.9.1-cp312-cp312-macosx_11_0_x86_64.whl
+    pip install torch-2.9.1-cp313-cp313-macosx_11_0_x86_64.whl
     ```
 3. 验证是否安装成功：
    ```bash
@@ -47,12 +47,14 @@ Starting from version 2.3, PyTorch has dropped support for Intel-based macOS. Th
 * ✅ 使用 **Intel MKL** 作为 BLAS 后端，提供更高的数值计算性能
 * ✅ 启用 **OpenMP** 并行支持，充分利用多核 CPU 加速张量运算
 * ✅ 启用 **oneDNN** 支持，自动加速部分 CNN、线性层等算子，提升 CPU 上的推理性能
+* ✅ 启用 **Metal Performance Shaders (MPS)** 后端，在 macOS 上提供 GPU 加速能力，通过 Metal 后端优化张量运算效率
 
 The PyTorch wheels built by this project have the following features:
 
 * ✅ **Intel MKL** as the BLAS backend for high-performance numerical operations
 * ✅ **OpenMP** support enabled to accelerate tensor computations on multi-core CPUs
 * ✅ **oneDNN** support enabled to accelerate CPU inference for convolution and linear layers
+* ✅ **Metal Performance Shaders (MPS)** backend enabled to provide GPU acceleration on macOS, leveraging the Metal framework to optimize tensor computation performance
 
 ---
 
