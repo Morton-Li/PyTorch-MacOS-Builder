@@ -153,12 +153,13 @@ jobs:
           USE_CUDA: "OFF"
           USE_CUDNN: "OFF"
           USE_CUSPARSELT: "OFF"
-          USE_MPS: "OFF"
+          USE_MPS: "ON"
           USE_ROCM: "OFF"
           USE_ROCM_KERNEL_ASSERT: "OFF"
           USE_NNPACK: "ON"
           USE_MPI: "OFF"
           USE_DISTRIBUTED: "ON"
+          USE_PYTORCH_METAL_EXPORT: "ON"
           BLAS: "MKL"
           USE_MKLDNN: "ON"
           USE_OPENMP: "ON"
@@ -184,7 +185,7 @@ jobs:
               export MAX_JOBS=4
           fi
           
-          python3.12 -m venv venv
+          python3.13 -m venv venv
           source venv/bin/activate
           pip install --upgrade pip setuptools wheel
           pip install -r pytorch/requirements.txt
