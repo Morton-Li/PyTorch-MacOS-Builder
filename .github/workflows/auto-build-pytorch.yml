@@ -224,7 +224,7 @@ jobs:
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     strategy:
       matrix:
-        python_version: [ 3.10, 3.11, 3.12, 3.13, 3.14 ]
+        python_version: [ '3.10', '3.11', '3.12', '3.13', '3.14' ]
     name: Build PyTorch for Python ${{ matrix.python_version }}
     steps:
       - name: Checkout Project
