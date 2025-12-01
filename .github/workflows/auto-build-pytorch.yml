@@ -332,7 +332,7 @@ jobs:
           pip install --upgrade pip setuptools numpy
           pip install wheels/*.whl
 
-          python -c "import torch; print(torch.__version__)"
+          python -c "import torch; print(f'Torch version: {torch.__version__}'); print(f'Metal Performance Shaders (MPS) support: {torch.backends.mps.is_built()}')"
 
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
