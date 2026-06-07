@@ -23,46 +23,17 @@ jobs:
       - name: Get latest PyTorch stable tag
         id: get_tag
         run: |
-          LATEST_TAG=""
-          
-          page=1
-          while :; do
-            echo "Fetching page $page ..."
-            RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/pytorch/pytorch/tags?per_page=100&page=$page")
-          
-            # 如果响应不是数组则退出
-            if ! echo "$RESPONSE" | jq -e 'type=="array"' >/dev/null; then
-              echo "❌ Unexpected response: $RESPONSE"
-              exit 1
-            fi
-          
-            # 提取符合格式的 tag
-            TAG=$(echo "$RESPONSE" | jq -r '.[].name' | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | sort -Vr | head -n 1)
-            if [ -n "$TAG" ]; then
-              # 与已有的 LATEST_TAG 比较取最新
-              if [ -z "$LATEST_TAG" ] || [ "$(printf "%s\n%s" "$TAG" "$LATEST_TAG" | sort -Vr | head -n1)" = "$TAG" ]; then
-                LATEST_TAG="$TAG"
-              fi
-            fi
-          
-            # 如果有 LATEST_TAG 则跳出循环
-            if [ -n "$LATEST_TAG" ]; then
-              break
-            fi
-          
-            # 最多翻 20 页
-            if [ "$page" -ge 20 ]; then
-              break
-            fi
-          
-            page=$((page + 1))
-          done
-          
+          LATEST_TAG=$(git ls-remote --tags --refs https://github.com/pytorch/pytorch.git 'refs/tags/v*.*.*' \
+            | awk -F/ '{print $NF}' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -Vr \
+            | head -n 1)
+
           if [ -z "$LATEST_TAG" ]; then
-            echo "❌ No valid tags found."
+            echo "❌ No valid PyTorch stable tags found."
             exit 1
           fi
-          
+
           echo "Latest tag: $LATEST_TAG"
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
           LATEST_VERSION="${LATEST_TAG#v}"
