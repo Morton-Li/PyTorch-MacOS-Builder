@@ -1,0 +1,39 @@
+diff --git a/cmake/Codegen.cmake b/cmake/Codegen.cmake
+index 6647fd8b8b4..e11e8d7674e 100644
+--- a/cmake/Codegen.cmake
++++ b/cmake/Codegen.cmake
+@@ -375,25 +375,32 @@ if(INTERN_BUILD_ATEN_OPS)
+   if(CXX_AVX512_FOUND)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_AVX512_CPU_DEFINITION")
+     # HIP code also needs CPU feature defines for DispatchStub ABI compatibility
+     if(USE_ROCM)
+       string(APPEND CMAKE_HIP_FLAGS " -DHAVE_AVX512_CPU_DEFINITION")
+     endif()
++    # MPS Objective-C++ sources include DispatchStub.h and need the same ABI.
++    if(APPLE AND USE_MPS)
++      string(APPEND CMAKE_OBJCXX_FLAGS " -DHAVE_AVX512_CPU_DEFINITION")
++    endif()
+     list(APPEND CPU_CAPABILITY_NAMES "AVX512")
+     if(MSVC)
+       list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}/arch:AVX512")
+     else(MSVC)
+       list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -mavx512f -mavx512bw -mavx512vl -mavx512dq -mfma")
+     endif(MSVC)
+   endif(CXX_AVX512_FOUND)
+-
++
+   if(CXX_AVX2_FOUND)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_AVX2_CPU_DEFINITION")
+     if(USE_ROCM)
+       string(APPEND CMAKE_HIP_FLAGS " -DHAVE_AVX2_CPU_DEFINITION")
+     endif()
++    if(APPLE AND USE_MPS)
++      string(APPEND CMAKE_OBJCXX_FLAGS " -DHAVE_AVX2_CPU_DEFINITION")
++    endif()
+-
++
+     # Some versions of GCC pessimistically split unaligned load and store
+     # instructions when using the default tuning. This is a bad choice on
+     # new Intel and AMD processors so we disable it when compiling with AVX2.
+     # See https://stackoverflow.com/questions/52626726/why-doesnt-gcc-resolve-mm256-loadu-pd-as-single-vmovupd#tab-top
+     check_cxx_compiler_flag("-mno-avx256-split-unaligned-load -mno-avx256-split-unaligned-store" COMPILER_SUPPORTS_NO_AVX256_SPLIT)
