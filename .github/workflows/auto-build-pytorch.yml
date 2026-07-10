@@ -176,6 +176,24 @@ jobs:
           
           find scripts -type f -name "*.sh" -exec chmod +x {} +
 
+          apply_patches() {
+            local patch_dir="$1"
+            if [ ! -d "$patch_dir" ]; then
+              echo "No patches found in $patch_dir."
+              return 0
+            fi
+
+            find "$patch_dir" -maxdepth 1 -type f -name "*.patch" -print | sort | while read -r patch; do
+              echo " -> Applying $patch"
+              git apply --check "$patch" || { echo "❌ Failed to apply $patch"; exit 1; }
+              git apply "$patch"
+            done
+          }
+
+          PATCH_DIR="../patches/v${{ needs.get_latest_tag.outputs.major_version }}.${{ needs.get_latest_tag.outputs.minor_version }}"
+          echo "Applying patches from $PATCH_DIR ..."
+          apply_patches "$PATCH_DIR"
+
           export CMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
 
           python -m tools.build_libtorch
@@ -275,12 +293,23 @@ jobs:
 
           export CMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
 
-          echo "Applying all patches ..."
-          find ../patches -type f -name "*.patch" -print | sort | while read -r patch; do
-            echo " -> Applying $patch"
-            git apply --check "$patch" || { echo "❌ Failed to apply $patch"; exit 1; }
-            git apply "$patch"
-          done
+          apply_patches() {
+            local patch_dir="$1"
+            if [ ! -d "$patch_dir" ]; then
+              echo "No patches found in $patch_dir."
+              return 0
+            fi
+
+            find "$patch_dir" -maxdepth 1 -type f -name "*.patch" -print | sort | while read -r patch; do
+              echo " -> Applying $patch"
+              git apply --check "$patch" || { echo "❌ Failed to apply $patch"; exit 1; }
+              git apply "$patch"
+            done
+          }
+
+          PATCH_DIR="../patches/v${{ needs.get_latest_tag.outputs.major_version }}.${{ needs.get_latest_tag.outputs.minor_version }}"
+          echo "Applying patches from $PATCH_DIR ..."
+          apply_patches "$PATCH_DIR"
 
           python setup.py bdist_wheel --plat-name=macosx_11_0_$CMAKE_OSX_ARCHITECTURES
 
