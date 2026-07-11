@@ -1,0 +1,40 @@
+diff --git a/tools/embed_libomp_macos.py b/tools/embed_libomp_macos.py
+--- a/tools/embed_libomp_macos.py
++++ b/tools/embed_libomp_macos.py
+@@ -100,14 +100,27 @@ def main() -> int:
+     # still match.
+     libomp_dir_real = libomp_path.parent.resolve()
+     for rp in rpaths:
+         if Path(rp).resolve() == libomp_dir_real:
+-            subprocess.check_call(
+-                [
+-                    "install_name_tool",
+-                    "-rpath",
+-                    rp,
+-                    "@loader_path",
+-                    str(libtorch_cpu),
+-                ]
+-            )
++            if "@loader_path" in rpaths:
++                # CMake's install RPATH already contains @loader_path. Replacing
++                # the build-time OpenMP RPATH with the same value would create a
++                # duplicate LC_RPATH command that recent dyld versions reject.
++                subprocess.check_call(
++                    [
++                        "install_name_tool",
++                        "-delete_rpath",
++                        rp,
++                        str(libtorch_cpu),
++                    ]
++                )
++            else:
++                subprocess.check_call(
++                    [
++                        "install_name_tool",
++                        "-rpath",
++                        rp,
++                        "@loader_path",
++                        str(libtorch_cpu),
++                    ]
++                )
+             return 0

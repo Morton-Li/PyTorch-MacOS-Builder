@@ -339,11 +339,36 @@ jobs:
       - name: Test PyTorch wheel
         id: test-wheel
         run: |
-          set -e
+          set -euo pipefail
           python${{ matrix.python_version }} -m venv test-venv
           source test-venv/bin/activate
           pip install --upgrade pip setuptools numpy
           pip install wheels/*.whl
+
+          TORCH_LIB_DIR="$(python -c 'import sysconfig; from pathlib import Path; print(Path(sysconfig.get_paths()["purelib"]) / "torch" / "lib")')"
+          if [ ! -d "$TORCH_LIB_DIR" ]; then
+            echo "❌ Installed torch library directory not found: $TORCH_LIB_DIR"
+            exit 1
+          fi
+
+          echo "➡️ Auditing Mach-O LC_RPATH entries in $TORCH_LIB_DIR"
+          rpath_audit_failed=0
+          while IFS= read -r -d '' library; do
+            duplicate_rpaths=$(otool -l "$library" | awk '
+              $1 == "cmd" && $2 == "LC_RPATH" { expect_path = 1; next }
+              expect_path && $1 == "path" { print $2; expect_path = 0 }
+            ' | sort | uniq -d)
+
+            if [ -n "$duplicate_rpaths" ]; then
+              echo "❌ Duplicate LC_RPATH entries in $library:"
+              echo "$duplicate_rpaths"
+              rpath_audit_failed=1
+            fi
+          done < <(find "$TORCH_LIB_DIR" -type f \( -name '*.dylib' -o -name '*.so' \) -print0)
+
+          if [ "$rpath_audit_failed" -ne 0 ]; then
+            exit 1
+          fi
 
           python -c "import torch; print(f'Torch version: {torch.__version__}'); print(f'Metal Performance Shaders (MPS) support: {torch.backends.mps.is_built()}')"
 
