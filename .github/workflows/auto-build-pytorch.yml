@@ -101,6 +101,9 @@ jobs:
     needs: [get_latest_tag]
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     steps:
+      - name: Checkout Project
+        uses: actions/checkout@v5
+
       - name: Restore LibTorch ccache Cache
         id: restore-ccache
         uses: actions/cache/restore@v4
@@ -189,6 +192,11 @@ jobs:
               git apply "$patch"
             done
           }
+
+          if [ ! -d ../patches ]; then
+            echo "❌ Project patches directory is unavailable."
+            exit 1
+          fi
 
           PATCH_DIR="../patches/v${{ needs.get_latest_tag.outputs.major_version }}.${{ needs.get_latest_tag.outputs.minor_version }}"
           echo "Applying patches from $PATCH_DIR ..."
@@ -306,6 +314,11 @@ jobs:
               git apply "$patch"
             done
           }
+
+          if [ ! -d ../patches ]; then
+            echo "❌ Project patches directory is unavailable."
+            exit 1
+          fi
 
           PATCH_DIR="../patches/v${{ needs.get_latest_tag.outputs.major_version }}.${{ needs.get_latest_tag.outputs.minor_version }}"
           echo "Applying patches from $PATCH_DIR ..."
