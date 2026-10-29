@@ -221,9 +221,32 @@ jobs:
     if: needs.get_latest_tag.outputs.skip_build == 'false'
     strategy:
       matrix:
-        python_version: [ '3.11', '3.12', '3.13', '3.14' ]
+        python_version: [ '3.11', '3.12', '3.13', '3.14', '3.15' ]
     name: Build PyTorch for Python ${{ matrix.python_version }}
     steps:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python_version }}
+          architecture: x64
+
+      - name: Verify Python runtime
+        env:
+          PYTHON_VERSION: ${{ matrix.python_version }}
+        run: |
+          python - <<'PY'
+          import os
+          import platform
+          import sys
+          import sysconfig
+
+          assert platform.machine() == "x86_64", platform.machine()
+          assert platform.python_implementation() == "CPython"
+          assert platform.python_version().startswith(os.environ["PYTHON_VERSION"] + ".")
+          assert not sysconfig.get_config_var("Py_GIL_DISABLED"), "Expected regular CPython"
+          print(sys.version)
+          PY
+
       - name: Checkout Project
         uses: actions/checkout@v5
 
@@ -279,7 +302,7 @@ jobs:
 
           mkdir -p wheels
           
-          python${{ matrix.python_version }} -m venv venv
+          python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip setuptools wheel
           pip install -r pytorch/requirements.txt
@@ -341,7 +364,7 @@ jobs:
         id: test-wheel
         run: |
           set -euo pipefail
-          python${{ matrix.python_version }} -m venv test-venv
+          python -m venv test-venv
           source test-venv/bin/activate
           pip install --upgrade pip setuptools numpy
           pip install wheels/*.whl
